@@ -1,19 +1,20 @@
 // server.js
 const express = require("express");
 const { Client, LocalAuth } = require("whatsapp-web.js");
-const qrcode = require("qrcode-terminal");
+const qrcodeTerminal = require("qrcode-terminal");
+const QRCode = require("qrcode");
 const fs = require("fs");
 const path = require("path");
 const cors = require("cors");
 
 const app = express();
 app.use(express.json());
-
-// Permitir CORS para cualquier origin
 app.use(cors());
 
-// 1) Configuramos el cliente de WhatsApp con LocalAuth
+// Sirve el archivo qr.png para poder descargarlo o escanearlo desde el navegador
+app.use("/qr.png", express.static(path.join(__dirname, "qr.png")));
 
+// 1) Configuramos el cliente de WhatsApp con LocalAuth
 const client = new Client({
   authStrategy: new LocalAuth({ clientId: "default" }),
   puppeteer: {
@@ -24,20 +25,28 @@ const client = new Client({
 
 // 2) Generar QR en consola si hace falta
 client.on("qr", (qr) => {
-  // 2a) Mostrar un Data-URL por consola (pégalo en el navegador para ver el QR)
+  // 2a) Mostrar un QR ASCII pequeño en consola
+  qrcodeTerminal.generate(qr, { small: true });
+
+  // 2b) Mostrar un Data-URL por consola (pégalo en el navegador para ver el QR)
   QRCode.toDataURL(qr, (err, url) => {
-    if (err) return console.error(err);
-    console.log("QR Data-URL (pégalo en el navegador):\n", url);
+    if (err) return console.error("Error generando Data-URL:", err);
+    console.log("\nQR Data-URL (pégalo en el navegador):\n", url);
   });
 
-  // 2b) Opcional: guardarlo como imagen local para descargar y escanear
+  // 2c) Guardarlo como imagen local para descargar y escanear
   QRCode.toFile("qr.png", qr, { width: 300 }, (err) => {
-    if (err) console.error("Error creando qr.png", err);
-    else console.log("QR guardado en qr.png");
+    if (err) console.error("Error creando qr.png:", err);
+    else console.log("QR guardado en qr.png (disponible en GET /qr.png)");
   });
 });
+
 // 3) Arrancar el cliente
 client.initialize();
+
+client.on("ready", () => {
+  console.log("✅ Cliente WhatsApp listo");
+});
 
 // 4) Ruta para envío de mensajes
 app.post("/send", async (req, res) => {
