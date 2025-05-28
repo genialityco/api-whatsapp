@@ -2,9 +2,9 @@
 const express = require("express");
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const qrcode = require("qrcode-terminal");
-const fs = require('fs');
-const path = require('path');
-const cors = require('cors');
+const fs = require("fs");
+const path = require("path");
+const cors = require("cors");
 
 const app = express();
 app.use(express.json());
@@ -18,19 +18,24 @@ const client = new Client({
   authStrategy: new LocalAuth({ clientId: "default" }),
   puppeteer: {
     headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox'
-    ]
-  }
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  },
 });
 
 // 2) Generar QR en consola si hace falta
 client.on("qr", (qr) => {
-  console.log("Escanea este QR con WhatsApp:");
-  qrcode.generate(qr, { small: true });
-});
+  // 2a) Mostrar un Data-URL por consola (pégalo en el navegador para ver el QR)
+  QRCode.toDataURL(qr, (err, url) => {
+    if (err) return console.error(err);
+    console.log("QR Data-URL (pégalo en el navegador):\n", url);
+  });
 
+  // 2b) Opcional: guardarlo como imagen local para descargar y escanear
+  QRCode.toFile("qr.png", qr, { width: 300 }, (err) => {
+    if (err) console.error("Error creando qr.png", err);
+    else console.log("QR guardado en qr.png");
+  });
+});
 // 3) Arrancar el cliente
 client.initialize();
 
