@@ -13,9 +13,16 @@ app.use(express.json());
 app.use(cors());
 
 // 1) Configuramos el cliente de WhatsApp con LocalAuth
+
 const client = new Client({
-  authStrategy: new LocalAuth(), // guarda sesión en ./wwebjs_auth/
-  puppeteer: { headless: true },
+  authStrategy: new LocalAuth({ clientId: "default" }),
+  puppeteer: {
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox'
+    ]
+  }
 });
 
 // 2) Generar QR en consola si hace falta
