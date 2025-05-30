@@ -16,6 +16,10 @@ app.use("/qr.png", express.static(path.join(__dirname, "qr.png")));
 
 let isReady = false;
 
+// Estado del cliente y último QR
+let clientStatus = "inicializando"; // inicializando | esperando_qr | autenticando | listo | desconectado | error
+let lastQrDataUrl = null;
+
 // 1) Configuramos el cliente de WhatsApp con LocalAuth
 const client = new Client({
   authStrategy: new LocalAuth({ clientId: "default" }),
@@ -28,13 +32,19 @@ const client = new Client({
 
 // 2) Evento QR
 client.on("qr", (qr) => {
+  clientStatus = "esperando_qr";
   // ASCII pequeño en consola
   qrcodeTerminal.generate(qr, { small: true });
 
   // Data-URL para pegar en el navegador
   QRCode.toDataURL(qr, (err, url) => {
-    if (err) return console.error("Error generando Data-URL:", err);
-    console.log("\nQR Data-URL (pégalo en el navegador):\n", url);
+    if (err) {
+      console.error("Error generando Data-URL:", err);
+      lastQrDataUrl = null;
+    } else {
+      lastQrDataUrl = url;
+      console.log("\nQR Data-URL (pégalo en el navegador):\n", url);
+    }
   });
 
   // Guardar como imagen
@@ -44,10 +54,34 @@ client.on("qr", (qr) => {
   });
 });
 
-// 3) Cuando esté listo
+// Evento autenticando
+client.on("authenticated", () => {
+  clientStatus = "autenticando";
+  lastQrDataUrl = null;
+  console.log("🔐 Autenticando...");
+});
+
+// Evento listo
 client.on("ready", () => {
   isReady = true;
+  clientStatus = "listo";
+  lastQrDataUrl = null;
   console.log("✅ Cliente WhatsApp listo");
+});
+
+// Evento desconectado
+client.on("disconnected", (reason) => {
+  isReady = false;
+  clientStatus = "desconectado";
+  lastQrDataUrl = null;
+  console.log("❌ Cliente desconectado:", reason);
+});
+
+// Evento error
+client.on("auth_failure", (msg) => {
+  clientStatus = "error";
+  lastQrDataUrl = null;
+  console.error("Error de autenticación:", msg);
 });
 
 // 4) Inicializar
@@ -76,6 +110,15 @@ app.post("/send", async (req, res) => {
     console.error("Error enviando mensaje:", err);
     return res.status(500).json({ error: err.message });
   }
+});
+
+// Ruta para consultar el estado del cliente y el QR (si aplica)
+app.get("/status", (req, res) => {
+  res.json({
+    status: clientStatus,
+    isReady,
+    qr: lastQrDataUrl, // null si no hay QR pendiente
+  });
 });
 
 // 6) Ruta de logout
