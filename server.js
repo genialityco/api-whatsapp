@@ -1,5 +1,5 @@
 // server.js
-require('dotenv').config();
+require("dotenv").config();
 const express = require("express");
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const qrcodeTerminal = require("qrcode-terminal");
@@ -12,36 +12,33 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// Sirve el QR como imagen estática para descarga/escaneo
 app.use("/qr.png", express.static(path.join(__dirname, "qr.png")));
 
 let isReady = false;
-let clientStatus = "inicializando"; // inicializando | esperando_qr | autenticando | listo | desconectado | error
+let clientStatus = "inicializando";
 let lastQrDataUrl = null;
 
-// Objeto para guardar el consentimiento por chatId
 const notificationConsent = {};
 
-// --- Elige Puppeteer completo o Core según entorno ---
-const useFull = process.env.USE_FULL_PUPPETEER === 'true';
-const puppeteer = useFull
-  ? require("puppeteer")
-  : require("puppeteer-core");
+const useFull = process.env.USE_FULL_PUPPETEER === "true";
 
-// 1) Configuramos el cliente de WhatsApp con LocalAuth
 const client = new Client({
   authStrategy: new LocalAuth({ clientId: "default" }),
   puppeteer: {
     headless: true,
-    // solo necesario si usamos puppeteer-core:
-    executablePath: !useFull
-      ? process.env.CHROME_PATH  // en Render suele estar definido como /usr/bin/chrome-stable
-      : undefined,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    executablePath: !useFull ? process.env.CHROME_PATH : undefined,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-extensions",
+      "--disable-gpu",
+      "--single-process",
+      "--no-zygote",
+    ],
   },
 });
 
-// 2) Evento QR
 client.on("qr", (qr) => {
   clientStatus = "esperando_qr";
   qrcodeTerminal.generate(qr, { small: true });
@@ -52,24 +49,21 @@ client.on("qr", (qr) => {
       lastQrDataUrl = null;
     } else {
       lastQrDataUrl = url;
-      console.log("\nQR Data-URL (pégalo en el navegador):\n", url);
+      console.log("\nQR Data-URL:", url);
     }
   });
 
   QRCode.toFile("qr.png", qr, { width: 300 }, (err) => {
     if (err) console.error("Error creando qr.png:", err);
-    else console.log("QR guardado en qr.png (GET /qr.png)");
   });
 });
 
-// Evento autenticando
 client.on("authenticated", () => {
   clientStatus = "autenticando";
   lastQrDataUrl = null;
   console.log("🔐 Autenticando...");
 });
 
-// Evento listo
 client.on("ready", () => {
   isReady = true;
   clientStatus = "listo";
@@ -77,7 +71,6 @@ client.on("ready", () => {
   console.log("✅ Cliente WhatsApp listo");
 });
 
-// Evento desconectado
 client.on("disconnected", (reason) => {
   isReady = false;
   clientStatus = "desconectado";
@@ -85,17 +78,14 @@ client.on("disconnected", (reason) => {
   console.log("❌ Cliente desconectado:", reason);
 });
 
-// Evento error de autenticación
 client.on("auth_failure", (msg) => {
   clientStatus = "error";
   lastQrDataUrl = null;
   console.error("Error de autenticación:", msg);
 });
 
-// 4) Inicializar
 client.initialize();
 
-// 5) Ruta de envío
 app.post("/send", async (req, res) => {
   if (!isReady) {
     return res.status(503).json({
@@ -110,78 +100,65 @@ app.post("/send", async (req, res) => {
 
   const chatId = `${phone}@c.us`;
 
-  // Si ya aceptó/rechazó, solo envía el mensaje normal
-  if (notificationConsent[chatId] === "accepted") {
-    try {
-      const msg = await client.sendMessage(chatId, message);
-      return res.json({ status: "enviado", id: msg.id._serialized });
-    } catch (err) {
-      console.error("Error enviando mensaje:", err);
-      return res.status(500).json({ error: err.message });
-    }
-  }
-
-  // Si no ha aceptado/rechazado, envía el mensaje y luego la pregunta de consentimiento
   try {
-    // Envía el mensaje original
     await client.sendMessage(chatId, message);
 
-    // Envía la pregunta de consentimiento
-    const consentMsg = "¿Estás de acuerdo en recibir estas notificaciones vía WhatsApp y poder aceptarlas o rechazarlas aquí mismo? Responde [si] o [no].";
-    await client.sendMessage(chatId, consentMsg);
+    if (!notificationConsent[chatId]) {
+      const consentMsg =
+        "¿Aceptas recibir notificaciones por WhatsApp? Responde [si] o [no].";
+      await client.sendMessage(chatId, consentMsg);
+      return res.json({ status: "enviado_con_consentimiento" });
+    }
 
-    return res.json({ status: "enviado_con_consentimiento" });
+    res.json({ status: "enviado" });
   } catch (err) {
     console.error("Error enviando mensaje:", err);
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// Escucha respuestas del usuario para consentimiento
-client.on("message", async (msg) => {
-  const chatId = msg.from;
-  const body = msg.body.trim().toLowerCase();
-
-  // Solo procesa si no hay consentimiento aún
-  if (!notificationConsent[chatId]) {
-    if (body === "si" || body === "sí") {
-      notificationConsent[chatId] = "accepted";
-      await client.sendMessage(chatId, "Has aceptado recibir notificaciones por WhatsApp. ¡Gracias!");
-    } else if (body === "no") {
-      notificationConsent[chatId] = "rejected";
-      await client.sendMessage(chatId, "Has rechazado recibir notificaciones por WhatsApp. No recibirás más mensajes.");
-    }
-  }
-});
-
-// Ruta de estado
-app.get("/status", (req, res) => {
-  res.json({
-    status: clientStatus,
-    isReady,
-    qr: lastQrDataUrl,
-  });
-});
-
-// 6) Ruta de logout
-app.post("/logout", async (req, res) => {
-  try {
-    await client.logout();
-    await client.destroy();
-    const authDir = path.resolve(__dirname, "wwebjs_auth");
-    if (fs.existsSync(authDir)) {
-      fs.rmSync(authDir, { recursive: true, force: true });
-    }
-    isReady = false;
-    res.json({ status: "sesión completamente cerrada" });
-  } catch (err) {
-    console.error("Error en logout completo:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// 7) Levantar servidor
+client.on("message", async (msg) => {
+  const chatId = msg.from;
+  const body = msg.body.trim().toLowerCase();
+
+  if (!notificationConsent[chatId]) {
+    if (body === "si" || body === "sí") {
+      notificationConsent[chatId] = "accepted";
+      await client.sendMessage(
+        chatId,
+        "Has aceptado recibir notificaciones por WhatsApp."
+      );
+    } else if (body === "no") {
+      notificationConsent[chatId] = "rejected";
+      await client.sendMessage(
+        chatId,
+        "Has rechazado recibir notificaciones por WhatsApp."
+      );
+    }
+  }
+});
+
+app.get("/status", (req, res) => {
+  res.json({ status: clientStatus, isReady, qr: lastQrDataUrl });
+});
+
+app.post("/logout", async (req, res) => {
+  try {
+    await client.logout();
+    await client.destroy();
+    fs.rmSync(path.resolve(__dirname, "wwebjs_auth"), {
+      recursive: true,
+      force: true,
+    });
+    isReady = false;
+    res.json({ status: "sesión cerrada correctamente" });
+  } catch (err) {
+    console.error("Error en logout:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Backend Whatsapp listo en http://localhost:${PORT}`);
+  console.log(`🚀 Backend WhatsApp listo en http://localhost:${PORT}`);
 });
