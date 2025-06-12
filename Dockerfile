@@ -1,5 +1,5 @@
-# Use official Node.js base image
-FROM --platform=linux/amd64 node:18-bullseye
+# Use official Node.js base image 
+FROM  --platform=linux/amd64 node:18-bullseye 
 
 # Install dependencies and Google Chrome (clean, verified method)
 RUN apt-get update && \
@@ -24,12 +24,19 @@ RUN npm ci --production
 # Copy rest of the source code
 COPY . .
 
+# Start app
+RUN mkdir -p /app/wwebjs_auth && chmod -R 777 /app/wwebjs_auth
+
+
 # Puppeteer config (skip Chromium, use system Chrome)
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+ENV USE_FULL_PUPPETEER=false \
+    CHROME_PATH=/usr/bin/google-chrome-stable \
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 
-# Expose app port
+# 🗂️ Persist authentication data
+#VOLUME [ "/app/.wwebjs_auth" ]
+
 EXPOSE 3000
 
-# Start app
 CMD ["node", "server.js"]
