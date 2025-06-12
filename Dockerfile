@@ -1,34 +1,35 @@
-# Usa una imagen estable de Node.js
-FROM node:18-bullseye
+# Use official Node.js base image
+FROM --platform=linux/amd64 node:18-bullseye
 
-# Instala dependencias del sistema para Puppeteer + Chrome
+# Install dependencies and Google Chrome (clean, verified method)
 RUN apt-get update && \
-    apt-get install -y wget gnupg ca-certificates && \
-    wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub \
-       | apt-key add - && \
-    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" \
-       > /etc/apt/sources.list.d/google.list && \
+    apt-get install -y wget gnupg ca-certificates dirmngr && \
+    mkdir -p /etc/apt/keyrings && \
+    mkdir -p /root/.gnupg && chmod 700 /root/.gnupg && \
+    gpg --no-default-keyring --keyring /etc/apt/keyrings/google-chrome.gpg \
+        --keyserver keyserver.ubuntu.com --recv-keys 32EE5355A6BC6E42 && \
+    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
+        > /etc/apt/sources.list.d/google-chrome.list && \
     apt-get update && \
     apt-get install -y google-chrome-stable --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
+# Set working directory
 WORKDIR /app
 
-# Copia sólo package.json y lock para caché
+# Copy package files and install dependencies
 COPY package*.json ./
-
-# Instala dependencias
 RUN npm ci --production
 
-# Copia el resto del código
+# Copy rest of the source code
 COPY . .
 
-# Define variable para que Puppeteer use el Chrome instalado
+# Puppeteer config (skip Chromium, use system Chrome)
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 
-# Expone el puerto que usa tu Express (por defecto 3000)
+# Expose app port
 EXPOSE 3000
 
-# Comando de arranque
+# Start app
 CMD ["node", "server.js"]

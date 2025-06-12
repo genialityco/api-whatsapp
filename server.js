@@ -1,5 +1,5 @@
 // server.js
-require('dotenv').config();
+require("dotenv").config();
 const express = require("express");
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const qrcodeTerminal = require("qrcode-terminal");
@@ -23,10 +23,8 @@ let lastQrDataUrl = null;
 const notificationConsent = {};
 
 // --- Elige Puppeteer completo o Core según entorno ---
-const useFull = process.env.USE_FULL_PUPPETEER === 'true';
-const puppeteer = useFull
-  ? require("puppeteer")
-  : require("puppeteer-core");
+const useFull = process.env.USE_FULL_PUPPETEER === "true";
+const puppeteer = useFull ? require("puppeteer") : require("puppeteer-core");
 
 // 1) Configuramos el cliente de WhatsApp con LocalAuth
 const client = new Client({
@@ -35,7 +33,7 @@ const client = new Client({
     headless: true,
     // solo necesario si usamos puppeteer-core:
     executablePath: !useFull
-      ? process.env.CHROME_PATH  // en Render suele estar definido como /usr/bin/chrome-stable
+      ? process.env.CHROME_PATH // en Render suele estar definido como /usr/bin/chrome-stable
       : undefined,
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
   },
@@ -127,7 +125,8 @@ app.post("/send", async (req, res) => {
     await client.sendMessage(chatId, message);
 
     // Envía la pregunta de consentimiento
-    const consentMsg = "¿Estás de acuerdo en recibir estas notificaciones vía WhatsApp y poder aceptarlas o rechazarlas aquí mismo? Responde [si] o [no].";
+    const consentMsg =
+      "¿Estás de acuerdo en recibir estas notificaciones vía WhatsApp y poder aceptarlas o rechazarlas aquí mismo? Responde [si] o [no].";
     await client.sendMessage(chatId, consentMsg);
 
     return res.json({ status: "enviado_con_consentimiento" });
