@@ -69,10 +69,14 @@ client.on("authenticated", () => {
 
 // Evento listo
 client.on("ready", () => {
-  isReady = true;
-  clientStatus = "listo";
-  lastQrDataUrl = null;
-  console.log("✅ Cliente WhatsApp listo");
+  try {
+    isReady = true;
+    clientStatus = "listo";
+    lastQrDataUrl = null;
+    console.log("✅ Cliente WhatsApp listo");
+  } catch (err) {
+    console.error("🔥 Error en 'ready':", err);
+  }
 });
 
 // Evento desconectado
@@ -88,6 +92,14 @@ client.on("auth_failure", (msg) => {
   clientStatus = "error";
   lastQrDataUrl = null;
   console.error("Error de autenticación:", msg);
+});
+
+client.on("disconnected", (reason) => {
+  console.warn("⚠️ Cliente desconectado:", reason);
+});
+
+client.on("error", (error) => {
+  console.error("🛑 Error general:", error);
 });
 
 // 4) Inicializar
