@@ -1,7 +1,7 @@
 // server.js
 require("dotenv").config();
 const express = require("express");
-const { Client, LocalAuth } = require("whatsapp-web.js");
+const { Client, LocalAuth,NoAuth } = require("whatsapp-web.js");
 const qrcodeTerminal = require("qrcode-terminal");
 const QRCode = require("qrcode");
 const fs = require("fs");
