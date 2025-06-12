@@ -28,7 +28,7 @@ const puppeteer = useFull ? require("puppeteer") : require("puppeteer-core");
 
 // 1) Configuramos el cliente de WhatsApp con LocalAuth
 const client = new Client({
-  authStrategy: new LocalAuth({ clientId: "default" }),
+  authStrategy: new LocalAuth(),//new LocalAuth({ clientId: "default" }),
   puppeteer: {
     headless: true,
     // solo necesario si usamos puppeteer-core:
@@ -100,6 +100,14 @@ client.on("disconnected", (reason) => {
 
 client.on("error", (error) => {
   console.error("🛑 Error general:", error);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("🚨 Uncaught Exception:", err);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("🚨 Unhandled Rejection:", reason);
 });
 
 // 4) Inicializar

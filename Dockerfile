@@ -26,6 +26,7 @@ COPY . .
 
 # Start app
 RUN mkdir -p /app/wwebjs_auth && chmod -R 777 /app/wwebjs_auth
+RUN mkdir -p /app/.wwebjs_auth && chmod -R 777 /app/.wwebjs_auth
 
 
 # Puppeteer config (skip Chromium, use system Chrome)
