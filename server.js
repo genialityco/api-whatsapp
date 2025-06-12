@@ -41,6 +41,22 @@ const client = new Client({
   },
 });
 
+const chromePath = '/usr/bin/google-chrome-stable';
+
+if (fs.existsSync(chromePath)) {
+  console.log('✅ Chrome está instalado en:', chromePath);
+} else {
+  console.error('❌ Chrome no se encontró en:', chromePath);
+}
+
+const chromePath2 = '/usr/bin/google-chrome';
+
+if (fs.existsSync(chromePath2)) {
+  console.log('✅ Chrome está instalado en:', chromePath2);
+} else {
+  console.error('❌ Chrome no se encontró en:', chromePath2);
+}
+
 console.error("🔥 donde esta chrome':", process.env.CHROME_PATH, '/usr/bin/google-chrome-stable' );
 
 // 2) Evento QR
