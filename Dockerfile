@@ -1,5 +1,6 @@
 # Use official Node.js base image 
-FROM  --platform=linux/amd64 node:18-bullseye 
+#FROM  --platform=linux/amd64 node:18-bullseye 
+FROM   node:18-bullseye 
 
 # Install dependencies and Google Chrome (clean, verified method)
 RUN apt-get update && \
@@ -39,7 +40,7 @@ ENV USE_FULL_PUPPETEER=false \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 
 # 🗂️ Persist authentication data
-#VOLUME [ "/app/.wwebjs_auth" ]
+VOLUME [ "/app/.wwebjs_auth" ]
 
 EXPOSE 3000
 
