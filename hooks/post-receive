@@ -1,0 +1,23 @@
+#!/bin/bash
+
+APP_DIR="/root/api-whatsapp"
+GIT_DIR="$APP_DIR/.git"
+
+echo "[+] Starting deployment to $APP_DIR..."
+
+# Initial clone if directory doesn't exist
+if [ ! -d "$APP_DIR" ]; then
+  echo "[+] First-time setup: cloning project..."
+  git clone ~/git/api-whatsapp.git $APP_DIR
+else
+  echo "[+] Updating existing code..."
+  git --work-tree=$APP_DIR --git-dir=$GIT_DIR checkout -f
+fi
+
+cd $APP_DIR || exit
+
+echo "[+] Building and restarting containers..."
+docker compose down
+docker compose up --build -d
+
+echo "[✅] Deployment finished!"
