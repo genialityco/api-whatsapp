@@ -28,7 +28,7 @@ const puppeteer = useFull ? require("puppeteer") : require("puppeteer-core");
 
 // 1) Configuramos el cliente de WhatsApp con LocalAuth
 const client = new Client({
-  authStrategy: new LocalAuth(),//new LocalAuth({ clientId: "default" }),
+  authStrategy: new NoAuth(),//new LocalAuth({ clientId: "default" }),
   puppeteer: {
     headless: true,
     // solo necesario si usamos puppeteer-core:
