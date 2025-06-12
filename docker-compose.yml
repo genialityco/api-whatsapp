@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  whatsapp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: whatsapp-app
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./.wwebjs_auth:/app/.wwebjs_auth
+      - ./qr.png:/app/qr.png
+    environment:
+      - USE_FULL_PUPPETEER=false
+      - CHROME_PATH=/usr/bin/google-chrome-stable
+      - PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
+    restart: unless-stopped
