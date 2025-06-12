@@ -1,7 +1,7 @@
 // server.js
 require("dotenv").config();
 const express = require("express");
-const { Client, LocalAuth,NoAuth } = require("whatsapp-web.js");
+const { Client, LocalAuth, NoAuth } = require("whatsapp-web.js");
 const qrcodeTerminal = require("qrcode-terminal");
 const QRCode = require("qrcode");
 const fs = require("fs");
@@ -28,16 +28,20 @@ const puppeteer = useFull ? require("puppeteer") : require("puppeteer-core");
 
 // 1) Configuramos el cliente de WhatsApp con LocalAuth
 const client = new Client({
-  authStrategy: new NoAuth(),//new LocalAuth({ clientId: "default" }),
+  authStrategy: new NoAuth(), //new LocalAuth({ clientId: "default" }),
   puppeteer: {
     headless: true,
     // solo necesario si usamos puppeteer-core:
     executablePath: !useFull
-      ? process.env.CHROME_PATH // en Render suele estar definido como /usr/bin/chrome-stable
+      ? process.env.CHROME_PATH
+        ? process.env.CHROME_PATH
+        : '/usr/bin/google-chrome-stable' // en Render suele estar definido como /usr/bin/chrome-stable
       : undefined,
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
   },
 });
+
+console.error("🔥 donde esta chrome':", process.env.CHROME_PATH, '/usr/bin/google-chrome-stable' );
 
 // 2) Evento QR
 client.on("qr", (qr) => {

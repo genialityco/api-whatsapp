@@ -27,6 +27,9 @@ COPY . .
 # Start app
 RUN mkdir -p /app/wwebjs_auth && chmod -R 777 /app/wwebjs_auth
 RUN mkdir -p /app/.wwebjs_auth && chmod -R 777 /app/.wwebjs_auth
+RUN chmod -R 777 /app
+
+RUN ls -l /usr/bin/google-chrome-stable
 
 
 # Puppeteer config (skip Chromium, use system Chrome)
@@ -40,4 +43,4 @@ ENV USE_FULL_PUPPETEER=false \
 
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+CMD ["node", "--trace-warnings","server.js"]

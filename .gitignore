@@ -52,3 +52,5 @@ logs/
 # Sesión y caché de whatsapp-web.js
 .wwebjs_auth/
 .wwebjs_cache/
+
+qr.png
