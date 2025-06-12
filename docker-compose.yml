@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     container_name: whatsapp-app
     ports:
-      - "3000:3000"
+      - "80:3000" 
     volumes:
       - ./.wwebjs_auth:/app/.wwebjs_auth
       - ./qr.png:/app/qr.png
