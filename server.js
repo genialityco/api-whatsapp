@@ -3,6 +3,9 @@ require("dotenv").config();
 const express = require("express");
 const { Client, LocalAuth, NoAuth } = require("whatsapp-web.js");
 const qrcodeTerminal = require("qrcode-terminal");
+const { MessageMedia } = require("whatsapp-web.js");
+const mime = require("mime-types");
+const axios = require("axios");
 const QRCode = require("qrcode");
 const fs = require("fs");
 const path = require("path");
@@ -35,29 +38,33 @@ const client = new Client({
     executablePath: !useFull
       ? process.env.CHROME_PATH
         ? process.env.CHROME_PATH
-        : '/usr/bin/google-chrome-stable' // en Render suele estar definido como /usr/bin/chrome-stable
+        : "/usr/bin/google-chrome-stable"
       : undefined,
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
   },
 });
 
-const chromePath = '/usr/bin/google-chrome-stable';
+const chromePath = "/usr/bin/google-chrome-stable";
 
 if (fs.existsSync(chromePath)) {
-  console.log('✅ Chrome está instalado en:', chromePath);
+  console.log("✅ Chrome está instalado en:", chromePath);
 } else {
-  console.error('❌ Chrome no se encontró en:', chromePath);
+  console.error("❌ Chrome no se encontró en:", chromePath);
 }
 
-const chromePath2 = '/usr/bin/google-chrome';
+const chromePath2 = "/usr/bin/google-chrome";
 
 if (fs.existsSync(chromePath2)) {
-  console.log('✅ Chrome está instalado en:', chromePath2);
+  console.log("✅ Chrome está instalado en:", chromePath2);
 } else {
-  console.error('❌ Chrome no se encontró en:', chromePath2);
+  console.error("❌ Chrome no se encontró en:", chromePath2);
 }
 
-console.error("🔥 donde esta chrome':", process.env.CHROME_PATH, '/usr/bin/google-chrome-stable' );
+console.error(
+  "🔥 donde esta chrome':",
+  process.env.CHROME_PATH,
+  "/usr/bin/google-chrome-stable"
+);
 
 // 2) Evento QR
 client.on("qr", (qr) => {
@@ -141,38 +148,94 @@ app.post("/send", async (req, res) => {
     });
   }
 
-  const { phone, message } = req.body;
-  if (!phone || !message) {
-    return res.status(400).json({ error: "Faltan phone o message" });
+  const { phone, message, imageUrl, imageBase64 } = req.body;
+
+  // Validar que al menos uno esté presente
+  if (!phone || (!message && !imageUrl && !imageBase64)) {
+    return res
+      .status(400)
+      .json({ error: "Faltan phone y al menos message o imagen" });
   }
 
   const chatId = `${phone}@c.us`;
 
-  // Si ya aceptó/rechazó, solo envía el mensaje normal
-  if (notificationConsent[chatId] === "accepted") {
-    try {
-      const msg = await client.sendMessage(chatId, message);
-      return res.json({ status: "enviado", id: msg.id._serialized });
-    } catch (err) {
-      console.error("Error enviando mensaje:", err);
-      return res.status(500).json({ error: err.message });
-    }
-  }
-
-  // Si no ha aceptado/rechazado, envía el mensaje y luego la pregunta de consentimiento
   try {
-    // Envía el mensaje original
-    await client.sendMessage(chatId, message);
+    let sendResult = null;
 
-    // Envía la pregunta de consentimiento
-    const consentMsg =
-      "¿Estás de acuerdo en recibir estas notificaciones vía WhatsApp y poder aceptarlas o rechazarlas aquí mismo? Responde [si] o [no].";
-    await client.sendMessage(chatId, consentMsg);
+    // 1) Si viene imagen (URL o base64)
+    if (imageUrl || imageBase64) {
+      let media;
 
-    return res.json({ status: "enviado_con_consentimiento" });
+      // Imagen desde URL
+      if (imageUrl) {
+        const response = await axios.get(imageUrl, {
+          responseType: "arraybuffer",
+        });
+        const contentType =
+          response.headers["content-type"] ||
+          mime.lookup(imageUrl) ||
+          "image/jpeg";
+        media = new MessageMedia(
+          contentType,
+          Buffer.from(response.data, "binary").toString("base64"),
+          "imagen." + mime.extension(contentType)
+        );
+      }
+
+      // Imagen en base64
+      if (imageBase64) {
+        // Soporta formato dataURL o solo base64
+        let mimeType, base64Data;
+        if (imageBase64.startsWith("data:")) {
+          const matches = imageBase64.match(
+            /^data:([A-Za-z-+/]+);base64,(.+)$/
+          );
+          if (!matches || matches.length !== 3) {
+            return res
+              .status(400)
+              .json({ error: "Formato de imagen base64 inválido" });
+          }
+          mimeType = matches[1];
+          base64Data = matches[2];
+        } else {
+          // Asumimos jpg por defecto si no es dataURL
+          mimeType = "image/jpeg";
+          base64Data = imageBase64;
+        }
+        media = new MessageMedia(
+          mimeType,
+          base64Data,
+          "imagen." + mime.extension(mimeType)
+        );
+      }
+
+      // Envía imagen + mensaje como caption (opcional)
+      sendResult = await client.sendMessage(chatId, media, {
+        caption: message || "",
+      });
+    }
+    // 2) Si solo es mensaje
+    else if (message) {
+      sendResult = await client.sendMessage(chatId, message);
+    }
+
+    // Revisa si sendResult existe y tiene ID serializada
+    if (sendResult && sendResult.id && sendResult.id._serialized) {
+      return res.json({ status: "enviado", id: sendResult.id._serialized });
+    } else {
+      // Respuesta genérica de éxito si no hay id, pero tampoco error
+      return res.json({
+        status: "enviado",
+        info: "Mensaje enviado pero no se obtuvo ID serializada.",
+      });
+    }
   } catch (err) {
     console.error("Error enviando mensaje:", err);
-    return res.status(500).json({ error: err.message });
+    // Devuelve el mensaje de error real y, si existe, un detalle de respuesta de WhatsApp
+    return res.status(500).json({
+      error: err.message || "Error desconocido al enviar el mensaje",
+      details: err.data || null,
+    });
   }
 });
 
@@ -185,10 +248,16 @@ client.on("message", async (msg) => {
   if (!notificationConsent[chatId]) {
     if (body === "si" || body === "sí") {
       notificationConsent[chatId] = "accepted";
-      await client.sendMessage(chatId, "Has aceptado recibir notificaciones por WhatsApp. ¡Gracias!");
+      await client.sendMessage(
+        chatId,
+        "Has aceptado recibir notificaciones por WhatsApp. ¡Gracias!"
+      );
     } else if (body === "no") {
       notificationConsent[chatId] = "rejected";
-      await client.sendMessage(chatId, "Has rechazado recibir notificaciones por WhatsApp. No recibirás más mensajes.");
+      await client.sendMessage(
+        chatId,
+        "Has rechazado recibir notificaciones por WhatsApp. No recibirás más mensajes."
+      );
     }
   }
 });
