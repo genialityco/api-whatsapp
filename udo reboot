@@ -1,0 +1,21 @@
+[0;1;32m●[0m cloudflared.service - cloudflared
+     Loaded: loaded (]8;;file://genwhatsapp/etc/systemd/system/cloudflared.service/etc/systemd/system/cloudflared.service]8;;; [0;1;32menabled[0m; preset: [0;1;32menabled[0m)
+     Active: [0;1;32mactive (running)[0m since Thu 2025-06-12 13:18:25 UTC; 21s ago
+ Invocation: 474078e5d04c41ba883d53b45ec59ae3
+   Main PID: 7954 (cloudflared)
+      Tasks: 6 (limit: 1109)
+     Memory: 16.4M (peak: 16.7M)
+        CPU: 335ms
+     CGroup: /system.slice/cloudflared.service
+             └─[0;38;5;245m7954 /usr/bin/cloudflared --no-autoupdate --config /etc/cloudflared/config.yml tunnel run[0m
+
+Jun 12 13:18:25 genwhatsapp cloudflared[7954]: 2025-06-12T13:18:25Z INF Starting metrics server on 127.0.0.1:20241/metrics
+Jun 12 13:18:25 genwhatsapp cloudflared[7954]: 2025-06-12T13:18:25Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(25497) CurveP256] connIndex=0 event=0 ip=198.41.192.107
+Jun 12 13:18:25 genwhatsapp cloudflared[7954]: 2025-06-12T13:18:25Z INF Registered tunnel connection connIndex=0 connection=6df52e0c-8cfc-4246-aea0-688e0f1d00fb event=0 ip=198.41.192.107 location=sjc01 protocol=quic
+Jun 12 13:18:25 genwhatsapp systemd[1]: Started cloudflared.service - cloudflared.
+Jun 12 13:18:25 genwhatsapp cloudflared[7954]: 2025-06-12T13:18:25Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(25497) CurveP256] connIndex=1 event=0 ip=198.41.200.233
+Jun 12 13:18:26 genwhatsapp cloudflared[7954]: 2025-06-12T13:18:26Z INF Registered tunnel connection connIndex=1 connection=50ef4a94-5f59-4da8-a91f-61011a0bb40b event=0 ip=198.41.200.233 location=sjc08 protocol=quic
+Jun 12 13:18:26 genwhatsapp cloudflared[7954]: 2025-06-12T13:18:26Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(25497) CurveP256] connIndex=2 event=0 ip=198.41.192.37
+Jun 12 13:18:26 genwhatsapp cloudflared[7954]: 2025-06-12T13:18:26Z INF Registered tunnel connection connIndex=2 connection=4385b7c4-1a60-4b2e-a034-6f9470974a03 event=0 ip=198.41.192.37 location=sjc01 protocol=quic
+Jun 12 13:18:27 genwhatsapp cloudflared[7954]: 2025-06-12T13:18:27Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(25497) CurveP256] connIndex=3 event=0 ip=198.41.200.53
+Jun 12 13:18:28 genwhatsapp cloudflared[7954]: 2025-06-12T13:18:28Z INF Registered tunnel connection connIndex=3 connection=78874fe4-d98d-428d-9f5c-f699b253474a event=0 ip=198.41.200.53 location=sjc08 protocol=quic
