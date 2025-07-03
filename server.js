@@ -17,12 +17,18 @@ app.use(cors());
 
 function ackToText(ack) {
   switch (ack) {
-    case -1: return "Error";
-    case 0: return "Pendiente";
-    case 1: return "Enviado";
-    case 2: return "Entregado";
-    case 3: return "Leído";
-    default: return "Desconocido";
+    case -1:
+      return "Error";
+    case 0:
+      return "Pendiente";
+    case 1:
+      return "Enviado";
+    case 2:
+      return "Entregado";
+    case 3:
+      return "Leído";
+    default:
+      return "Desconocido";
   }
 }
 
@@ -68,7 +74,7 @@ console.error(
 );
 
 // ACTUALIZA ESTADO DEL MENSAJE EN MONGODB
-client.on('message_ack', async (msg, ack) => {
+client.on("message_ack", async (msg, ack) => {
   try {
     if (!msg.id) return;
     const collection = getCollection();
@@ -76,19 +82,23 @@ client.on('message_ack', async (msg, ack) => {
       { messageId: msg.id._serialized },
       { $set: { ack, ackText: ackToText(ack), ackDate: new Date() } }
     );
-    console.log(`Mensaje ${msg.id._serialized} actualizado a estado ${ackToText(ack)}`);
+    // console.log(
+    //   `Mensaje ${msg.id._serialized} actualizado a estado ${ackToText(ack)}`
+    // );
   } catch (error) {
-    console.error('Error actualizando ACK en MongoDB:', error);
+    console.error("Error actualizando ACK en MongoDB:", error);
   }
 });
 
 // GUARDA CADA MENSAJE SALIENTE (AUNQUE FALLE EL ENDPOINT)
-client.on('message_create', async (msg) => {
+client.on("message_create", async (msg) => {
   try {
     if (msg.fromMe) {
       const collection = getCollection();
       // Si ya existe no lo inserta otra vez
-      const existe = await collection.findOne({ messageId: msg.id._serialized });
+      const existe = await collection.findOne({
+        messageId: msg.id._serialized,
+      });
       if (!existe) {
         await collection.insertOne({
           phone: msg.to,
@@ -99,11 +109,13 @@ client.on('message_create', async (msg) => {
           ackText: ackToText(msg.ack),
           date: new Date(),
         });
-        console.log(`(message_create) Guardado mensaje en MongoDB ${msg.id._serialized}`);
+        // console.log(
+        //   `(message_create) Guardado mensaje en MongoDB ${msg.id._serialized}`
+        // );
       }
     }
   } catch (err) {
-    console.error('Error guardando mensaje en message_create:', err);
+    console.error("Error guardando mensaje en message_create:", err);
   }
 });
 
@@ -174,7 +186,9 @@ app.post("/send", async (req, res) => {
 
   const { phone, message, imageUrl, imageBase64 } = req.body;
   if (!phone || (!message && !imageUrl && !imageBase64)) {
-    return res.status(400).json({ error: "Faltan phone y al menos message o imagen" });
+    return res
+      .status(400)
+      .json({ error: "Faltan phone y al menos message o imagen" });
   }
 
   const chatId = `${phone}@c.us`;
@@ -186,7 +200,9 @@ app.post("/send", async (req, res) => {
     if (imageUrl || imageBase64) {
       let media;
       if (imageUrl) {
-        const response = await axios.get(imageUrl, { responseType: "arraybuffer" });
+        const response = await axios.get(imageUrl, {
+          responseType: "arraybuffer",
+        });
         const contentType =
           response.headers["content-type"] ||
           mime.lookup(imageUrl) ||
@@ -200,9 +216,13 @@ app.post("/send", async (req, res) => {
       if (imageBase64) {
         let mimeType, base64Data;
         if (imageBase64.startsWith("data:")) {
-          const matches = imageBase64.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
+          const matches = imageBase64.match(
+            /^data:([A-Za-z-+/]+);base64,(.+)$/
+          );
           if (!matches || matches.length !== 3) {
-            return res.status(400).json({ error: "Formato de imagen base64 inválido" });
+            return res
+              .status(400)
+              .json({ error: "Formato de imagen base64 inválido" });
           }
           mimeType = matches[1];
           base64Data = matches[2];
@@ -210,9 +230,15 @@ app.post("/send", async (req, res) => {
           mimeType = "image/jpeg";
           base64Data = imageBase64;
         }
-        media = new MessageMedia(mimeType, base64Data, "imagen." + mime.extension(mimeType));
+        media = new MessageMedia(
+          mimeType,
+          base64Data,
+          "imagen." + mime.extension(mimeType)
+        );
       }
-      sendResult = await client.sendMessage(chatId, media, { caption: message || "" });
+      sendResult = await client.sendMessage(chatId, media, {
+        caption: message || "",
+      });
     }
     // Solo mensaje
     else if (message) {
@@ -250,20 +276,98 @@ app.post("/send", async (req, res) => {
   }
 });
 
+app.post("/send-consent", async (req, res) => {
+  if (!isReady) {
+    return res.status(503).json({
+      error: "El cliente aún no está listo, inténtalo en unos segundos.",
+    });
+  }
+
+  const { phone, message } = req.body;
+  if (!phone) {
+    return res.status(400).json({ error: "Falta phone" });
+  }
+
+  const chatId = `${phone}@c.us`;
+  const defaultConsentMessage = `
+¿Deseas seguir recibiendo mensajes del COLEGIO NACIONAL DE QUÍMICOS FARMACÉUTICOS DE COLOMBIA (CNQFC)?
+Por favor responde con el número según tu respuesta:
+1) Sí, quiero seguir recibiendo mensajes del CNQFC.
+2) No, deseo dejar de recibir mensajes del CNQFC.
+  `;
+  const mensajeConsentimiento = message || defaultConsentMessage;
+
+  const collection = getCollection("consentimientos");
+  try {
+    // Marca al usuario como pendiente de responder consentimiento ANTES de enviar mensaje
+    await collection.updateOne(
+      { chatId },
+      { $set: { pendingConsent: true, lastConsentMessage: mensajeConsentimiento } },
+      { upsert: true }
+    );
+    console.log("Marcado como pendiente en BD");
+
+    // Luego intenta enviar el mensaje de consentimiento
+    await client.sendMessage(chatId, mensajeConsentimiento);
+
+    res.json({ status: "pregunta de consentimiento enviada", chatId });
+  } catch (err) {
+    console.error("Error enviando consentimiento:", err);
+    // Si el envío falla, igual queda el registro en BD, así puedes revisar luego
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // CONSENTIMIENTO
 client.on("message", async (msg) => {
   const chatId = msg.from;
+
+  // SOLO responder si es chat individual, no grupo
+  if (!chatId.endsWith("@c.us")) return;
+
   const body = msg.body.trim().toLowerCase();
-  if (!notificationConsent[chatId]) {
-    if (body === "si" || body === "sí") {
-      notificationConsent[chatId] = "accepted";
-      await client.sendMessage(chatId, "Has aceptado recibir notificaciones por WhatsApp. ¡Gracias!");
-    } else if (body === "no") {
-      notificationConsent[chatId] = "rejected";
-      await client.sendMessage(chatId, "Has rechazado recibir notificaciones por WhatsApp. No recibirás más mensajes.");
+  const collection = getCollection("consentimientos");
+
+  // SOLO responde si tiene consentimiento pendiente
+  const consentDoc = await collection.findOne({ chatId, pendingConsent: true });
+  if (!consentDoc) return; // Si no tiene pendiente, ignora
+
+  let respuesta = null;
+  let mensaje = null;
+
+  if (body === "1" || body === "si" || body === "sí" || body === "s") {
+    respuesta = "accepted";
+    mensaje = "¡Genial! Seguirás recibiendo mensajes del COLEGIO NACIONAL DE QUÍMICOS FARMACÉUTICOS DE COLOMBIA (CNQFC).";
+  } else if (body === "2" || body === "no" || body === "n") {
+    respuesta = "opted_out";
+    mensaje = "Entendido, has dejado de recibir mensajes del COLEGIO NACIONAL DE QUÍMICOS FARMACÉUTICOS DE COLOMBIA (CNQFC).";
+  } else {
+    mensaje = "Por favor responde solo con 1 (sí, seguir recibiendo), 2 (no, dejar de recibir), SI o NO.";
+  }
+
+  // Envía siempre la respuesta correspondiente
+  try {
+    await client.sendMessage(chatId, mensaje);
+  } catch (err) {
+    console.error(`Error enviando mensaje a ${chatId}:`, err.message);
+  }
+
+  // Si hay respuesta válida, guarda el consentimiento y desmarca el pendiente
+  if (respuesta) {
+    try {
+      await collection.updateOne(
+        { chatId },
+        { $set: { consent: respuesta, date: new Date(), pendingConsent: false } },
+        { upsert: true }
+      );
+      console.log(`Consentimiento de ${chatId}: ${respuesta}`);
+    } catch (err) {
+      console.error("Error guardando consentimiento:", err);
     }
   }
 });
+
 
 // STATUS Y LOGOUT
 app.get("/status", (req, res) => {
@@ -273,7 +377,6 @@ app.get("/status", (req, res) => {
     qr: lastQrDataUrl,
   });
 });
-
 
 // VER ESTADO DE MENSAJES
 app.get("/sent-messages", async (req, res) => {
@@ -294,7 +397,6 @@ app.get("/sent-messages", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 
 app.post("/logout", async (req, res) => {
   try {
